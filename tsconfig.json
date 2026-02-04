@@ -36,6 +36,8 @@
     "noEmit": true,
     "emitDeclarationOnly": false,
     "allowImportingTsExtensions": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "strict": true,
     "jsx": "react-jsx",
     "verbatimModuleSyntax": false,
