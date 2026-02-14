@@ -25,6 +25,49 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Database Setup
+
+This project uses **MongoDB** as the database. You need to have MongoDB running before starting the application.
+
+### Quick Start with Docker
+
+```bash
+# Start MongoDB container
+$ docker-compose up -d
+
+# Verify container is running
+$ docker ps
+```
+
+### Environment Variables
+
+Create a `.env` file in the root directory:
+
+```bash
+# Copy the example file
+$ cp .env.example .env
+```
+
+Required variables:
+```env
+MONGODB_URI=mongodb://admin:password@localhost:27017/api_db?authSource=admin
+PORT=8080
+```
+
+### Database Architecture
+
+- **DatabaseModule** (`src/database/`): Centralized MongoDB connection
+  - Automatic retry on connection failure (5 attempts)
+  - Connection monitoring with event logging
+  - Environment-based configuration
+  
+- **MongoExceptionFilter** (`src/common/filters/`): Global error handling
+  - Connection errors → `503 Service Unavailable`
+  - Duplicate keys → `409 Conflict`
+  - Validation errors → `400 Bad Request`
+
+See [Database Documentation](src/database/README.md) for detailed information.
+
 ## Project setup
 
 ```bash
