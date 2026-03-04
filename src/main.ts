@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { MongoExceptionFilter } from './common/filters/mongo-exception.filter';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -15,6 +16,16 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new MongoExceptionFilter());
+
+  const config = new DocumentBuilder()
+    .setTitle('Apex Aura API')
+    .setDescription('Aura Farming API documentation')
+    .setVersion('1.0')
+    .addTag('users')
+    .build();
+
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, documentFactory());
 
   await app.listen(process.env.PORT ?? 8080);
 }
