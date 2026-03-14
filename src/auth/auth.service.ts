@@ -1,59 +1,41 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes, scrypt as _scrypt } from 'crypto';
-import { promisify } from 'util';
+import * as bcrypt from 'bcrypt';
+import { User } from 'src/users/entities/user.schema';
+import { UsersService } from 'src/users/users.service';
 
-const scrypt = promisify(_scrypt);
-
-const users = [
-  {
-    userId: 1,
-    email: 'admin@email.com',
-    password: '123456',
-  },
-];
-
+// auth.service.ts
 @Injectable()
 export class AuthService {
-  constructor(private jwtService: JwtService) {}
+  constructor(
+    private usersService: UsersService,
+    private jwtService: JwtService,
+  ) {}
 
-  async signUp(email: string, password: string) {
-    const existingUser = users.find((user) => user.email === email);
-    if (existingUser) {
-      return new BadRequestException('User already exists');
+  async validateUser(email: string, password: string) {
+    const user = await this.usersService.findByEmail(email);
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid credentials');
     }
 
-    const salt = randomBytes(8).toString('hex');
-    const hash = (await scrypt(password, salt, 32)) as Buffer;
+    const passwordMatch = await bcrypt.compare(password, user.password);
 
-    const saltAndHash = `${salt}.${hash.toString('hex')}`;
+    if (!passwordMatch) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
-    const newUser = {
-      userId: users.length + 1,
-      email,
-      password: saltAndHash,
-    };
-
-    users.push(newUser);
-    console.log('Signed up:', newUser);
-    const { password: _, ...newUserWithoutPassword } = newUser;
-
-    return newUserWithoutPassword;
+    return user;
   }
 
-  async signIn(email: string, password: string) {
-    const user = users.find((user) => user.email === email);
-    if (!user) {
-      return new BadRequestException('User not found');
-    }
+  login(user: User) {
+    const payload = {
+      sub: user._id,
+      email: user.email,
+    };
 
-    const [salt, storedHash] = user.password.split('.');
-    const hash = (await scrypt(password, salt, 32)) as Buffer;
-    if (storedHash !== hash.toString('hex')) {
-      return new BadRequestException('Invalid password');
-    }
-    console.log('Signed in:', user);
-    const payload = { username: user.email, sub: user.userId };
-    return { accessToken: this.jwtService.sign(payload) };
+    return {
+      access_token: this.jwtService.sign(payload),
+    };
   }
 }
