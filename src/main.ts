@@ -22,6 +22,7 @@ async function bootstrap() {
     .setDescription('Aura Farming API documentation')
     .setVersion('1.0')
     .addTag('users')
+    .addBearerAuth()
     .build();
 
   const documentFactory = () => SwaggerModule.createDocument(app, config);

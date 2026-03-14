@@ -1,10 +1,8 @@
-import { Controller, Get, Post, UseGuards } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
+import { Controller, Get, Post } from '@nestjs/common';
 
 @Controller('teams')
 export class TeamsController {
   @Get('')
-  @UseGuards(JwtAuthGuard)
   getAllTeams() {
     return 'getAllTeams';
   }
