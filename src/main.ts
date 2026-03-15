@@ -21,7 +21,6 @@ async function bootstrap() {
     .setTitle('Apex Aura API')
     .setDescription('Aura Farming API documentation')
     .setVersion('1.0')
-    .addTag('users')
     .addBearerAuth()
     .build();
 
