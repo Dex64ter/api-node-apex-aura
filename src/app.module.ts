@@ -9,9 +9,11 @@ import { TeamsModule } from './teams/teams.module';
 import { PassportModule } from '@nestjs/passport';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { TeamMembersController } from './team-members/team-members.controller';
-import { TeamMembersService } from './team-members/team-members.service';
-import { TeamMembersModule } from './team-members/team-members.module';
+import { TeamsController } from './teams/teams.controller';
+import { TasksController } from './tasks/tasks.controller';
+import { TasksModule } from './tasks/tasks.module';
+import { AuraService } from './aura/aura.service';
+import { AuraModule } from './aura/aura.module';
 
 @Module({
   imports: [
@@ -23,16 +25,17 @@ import { TeamMembersModule } from './team-members/team-members.module';
     AuthModule,
     TeamsModule,
     PassportModule,
-    TeamMembersModule,
+    TasksModule,
+    AuraModule,
   ],
-  controllers: [AppController, TeamMembersController],
+  controllers: [AppController, TeamsController, TasksController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    TeamMembersService,
+    AuraService,
   ],
 })
 export class AppModule {}
