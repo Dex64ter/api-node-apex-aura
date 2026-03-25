@@ -3,6 +3,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { User } from './entities/user.schema';
 import { Model } from 'mongoose';
+import * as bcryptjs from 'bcryptjs';
 
 @Injectable()
 export class UsersService {
@@ -11,14 +12,9 @@ export class UsersService {
   constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
   async create(data: CreateUserDto) {
-    try {
-      const user = await this.userModel.create(data);
-      this.logger.log(`User created: ${user.name}`);
-      return { name: user.name };
-    } catch (error) {
-      this.logger.error('Error creating user', error);
-      throw error; // O MongoExceptionFilter vai capturar
-    }
+    data.password = await bcryptjs.hash(data.password, 10);
+    const user = await this.userModel.create(data);
+    return { name: user.name };
   }
 
   async findAll() {
@@ -28,5 +24,9 @@ export class UsersService {
       this.logger.error('Error fetching users', error);
       throw error; // O MongoExceptionFilter vai capturar
     }
+  }
+
+  async findByEmail(email: string) {
+    return this.userModel.findOne({ email });
   }
 }
