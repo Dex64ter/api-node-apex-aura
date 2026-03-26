@@ -20,5 +20,7 @@ export class CreateUserDto {
     description: 'User password',
     required: true,
   })
-  password: string;
+  password!: string;
+  avatarUrl?: string;
+  isVerified?: boolean;
 }

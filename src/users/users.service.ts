@@ -14,7 +14,7 @@ export class UsersService {
   async create(data: CreateUserDto) {
     data.password = await bcryptjs.hash(data.password, 10);
     const user = await this.userModel.create(data);
-    return { name: user.name };
+    return user;
   }
 
   async findAll() {

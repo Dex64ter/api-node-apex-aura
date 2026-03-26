@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Team } from './schemas/team.schema';
 import { CreateTeamDto } from './dto/create-team.dto';
+import { TeamMember } from './schemas/team-member.schema';
 
 @Injectable()
 export class TeamsService {
@@ -11,12 +12,37 @@ export class TeamsService {
   constructor(
     @InjectModel(Team.name)
     private teamModel: Model<Team>,
+
+    @InjectModel(TeamMember.name)
+    private teamMemberModel: Model<TeamMember>,
   ) {}
 
   async create(data: CreateTeamDto, userId: string) {
     try {
-      const team = await this.teamModel.create({ ...data, created_by: userId });
-      return { name: team.name };
+      const existing = await this.teamModel.findOne({
+        name: data.name,
+        created_by: userId,
+      });
+
+      if (existing) {
+        throw new BadRequestException('Você já tem um time com esse nome');
+      }
+
+      const team = await this.teamModel.create({
+        ...data,
+        created_by: userId,
+      });
+
+      await this.teamMemberModel.create({
+        teamId: team._id,
+        userId,
+        role: 'boss',
+      });
+
+      return {
+        id: team._id,
+        name: team.name,
+      };
     } catch (error) {
       this.logger.error('Error creating team', error);
       throw error;

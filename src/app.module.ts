@@ -14,6 +14,8 @@ import { TasksController } from './tasks/tasks.controller';
 import { TasksModule } from './tasks/tasks.module';
 import { AuraService } from './aura/aura.service';
 import { AuraModule } from './aura/aura.module';
+import { MailService } from './mail/mail.service';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { AuraModule } from './aura/aura.module';
     PassportModule,
     TasksModule,
     AuraModule,
+    MailModule,
   ],
   controllers: [AppController, TeamsController, TasksController],
   providers: [
@@ -36,6 +39,7 @@ import { AuraModule } from './aura/aura.module';
       useClass: JwtAuthGuard,
     },
     AuraService,
+    MailService,
   ],
 })
 export class AppModule {}

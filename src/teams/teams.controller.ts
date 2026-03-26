@@ -13,7 +13,7 @@ export class TeamsController {
   }
 
   @Get(':id')
-  getTeamById(@Param() id: string) {
+  getTeamById(@Param('id') id: string) {
     return this.teamService.findOne(id);
   }
 

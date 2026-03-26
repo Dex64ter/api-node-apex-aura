@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Headers } from '@nestjs/common';
 import { LoginUserDto } from 'src/users/dto/login-user.dto';
 import { AuthService } from './auth.service';
 import { Public } from 'src/common/decorators/public.decorator';
@@ -28,7 +28,22 @@ export class AuthController {
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   @ApiResponse({ status: 401, description: 'E-mail já cadastrado' })
-  async signup(@Body() body: CreateUserDto) {
-    return this.authService.signup(body);
+  async signup(
+    @Body() body: CreateUserDto,
+    @Headers('authorization') token: string,
+  ) {
+    return this.authService.signup(body, token);
+  }
+
+  @Public()
+  @Post('request-code')
+  requestCode(@Body('email') email: string) {
+    return this.authService.requestEmailCode(email);
+  }
+
+  @Public()
+  @Post('verify-code')
+  verifyCode(@Body() body: { email: string; code: string }) {
+    return this.authService.verifyEmailCode(body.email, body.code);
   }
 }
