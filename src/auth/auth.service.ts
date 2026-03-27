@@ -51,8 +51,9 @@ export class AuthService {
     let payload: any;
 
     try {
+      const cleanToken = token.replace('Bearer ', '');
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      payload = this.jwtService.verify(token);
+      payload = this.jwtService.verify(cleanToken);
     } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
@@ -82,6 +83,10 @@ export class AuthService {
   }
 
   async requestEmailCode(email: string) {
+    if (!email) {
+      throw new UnauthorizedException('Email is required');
+    }
+
     const existingUser = await this.usersService.findByEmail(email);
 
     if (existingUser) {
@@ -97,7 +102,7 @@ export class AuthService {
         expiresAt: new Date(Date.now() + 10 * 60 * 1000),
         verified: false,
       },
-      { upsert: true, new: true },
+      { upsert: true, returnDocument: 'after' },
     );
 
     await this.mailService.sendVerificationEmail(email, code);

@@ -1,9 +1,10 @@
-import { Body, Controller, Post, Headers } from '@nestjs/common';
+import { Body, Controller, Post, Headers, Request, Get } from '@nestjs/common';
 import { LoginUserDto } from 'src/users/dto/login-user.dto';
 import { AuthService } from './auth.service';
 import { Public } from 'src/common/decorators/public.decorator';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { RequestCodeDTO, VerifyCodeDTO } from './dto/request-code.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -37,13 +38,23 @@ export class AuthController {
 
   @Public()
   @Post('request-code')
+  @ApiBody({ type: RequestCodeDTO })
   requestCode(@Body('email') email: string) {
     return this.authService.requestEmailCode(email);
   }
 
   @Public()
   @Post('verify-code')
+  @ApiBody({ type: VerifyCodeDTO })
   verifyCode(@Body() body: { email: string; code: string }) {
     return this.authService.verifyEmailCode(body.email, body.code);
+  }
+
+  @Get('me')
+  @ApiResponse({ status: 200, description: 'Usuário autenticado' })
+  @ApiResponse({ status: 401, description: 'Usuário não autenticado' })
+  @ApiBearerAuth('access-token')
+  validateToken(@Request() req) {
+    return req.user;
   }
 }

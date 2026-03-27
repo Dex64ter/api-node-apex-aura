@@ -5,10 +5,10 @@ export class EmailVerification {
   @Prop({ required: true })
   email!: string;
 
-  @Prop()
+  @Prop({ required: true })
   code!: string;
 
-  @Prop()
+  @Prop({ required: true })
   expiresAt!: Date;
 
   @Prop({ default: false })
@@ -17,3 +17,7 @@ export class EmailVerification {
 
 export const EmailVerificationSchema =
   SchemaFactory.createForClass(EmailVerification);
+
+// Indexes para excluir caso o email seja verificado
+EmailVerificationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+EmailVerificationSchema.index({ email: 1 }, { unique: true });
