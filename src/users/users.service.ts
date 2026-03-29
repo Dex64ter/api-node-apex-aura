@@ -13,8 +13,15 @@ export class UsersService {
 
   async create(data: CreateUserDto) {
     data.password = await bcryptjs.hash(data.password, 10);
-    const user = await this.userModel.create(data);
-    return user;
+    try {
+      const user = await this.userModel.create(data);
+      this.logger.log(`User created: ${user.email}`);
+      return user;
+    } catch (error) {
+      this.logger.error('Error creating user', error);
+      console.error(error);
+      throw error;
+    }
   }
 
   async findAll() {

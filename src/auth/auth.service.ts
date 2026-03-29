@@ -44,25 +44,17 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload),
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        avatarUrl: user.avatarUrl,
+        aura: user.aura,
+      },
     };
   }
 
-  async signup(user: CreateUserDto, token: string) {
-    let payload: any;
-
-    try {
-      const cleanToken = token.replace('Bearer ', '');
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-      payload = this.jwtService.verify(cleanToken);
-    } catch {
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    if (!payload.verified || payload.email !== user.email) {
-      throw new UnauthorizedException('Email not verified');
-    }
-
+  async signup(user: CreateUserDto) {
     const existingUser = await this.usersService.findByEmail(user.email);
 
     if (existingUser) {
@@ -74,7 +66,7 @@ export class AuthService {
       isVerified: true,
       avatarUrl:
         user.avatarUrl ||
-        `https://api.dicebear.com/9.x/avataaars-neutral/svg?seed=${user.name}`,
+        `https://api.dicebear.com/9.x/avataaars-neutral/png?seed=${user.name}`,
     };
 
     const newUser = await this.usersService.create(userData);
@@ -131,5 +123,40 @@ export class AuthService {
     );
 
     return { tempToken };
+  }
+
+  async signupWithCode(user: CreateUserDto, token: string) {
+    let payload: any;
+
+    try {
+      const cleanToken = token.replace('Bearer ', '');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+      payload = this.jwtService.verify(cleanToken);
+    } catch {
+      throw new UnauthorizedException('Invalid or expired token');
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    if (!payload.verified || payload.email !== user.email) {
+      throw new UnauthorizedException('Email not verified');
+    }
+
+    const existingUser = await this.usersService.findByEmail(user.email);
+
+    if (existingUser) {
+      throw new UnauthorizedException('Email already exists');
+    }
+
+    const userData = {
+      ...user,
+      isVerified: true,
+      avatarUrl:
+        user.avatarUrl ||
+        `https://api.dicebear.com/9.x/avataaars-neutral/svg?seed=${user.name}`,
+    };
+
+    const newUser = await this.usersService.create(userData);
+
+    return this.login(newUser);
   }
 }

@@ -3,7 +3,13 @@ import { LoginUserDto } from 'src/users/dto/login-user.dto';
 import { AuthService } from './auth.service';
 import { Public } from 'src/common/decorators/public.decorator';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { RequestCodeDTO, VerifyCodeDTO } from './dto/request-code.dto';
 
 @ApiTags('Auth')
@@ -19,7 +25,6 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Credenciais inválidas' })
   async login(@Body() body: LoginUserDto) {
     const user = await this.authService.validateUser(body.email, body.password);
-
     return this.authService.login(user);
   }
 
@@ -29,11 +34,22 @@ export class AuthController {
   @ApiBody({ type: CreateUserDto })
   @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
   @ApiResponse({ status: 401, description: 'E-mail já cadastrado' })
-  async signup(
+  async signup(@Body() body: CreateUserDto) {
+    return this.authService.signup(body);
+  }
+
+  @Public()
+  @Post('signup-with-code')
+  @ApiOperation({ summary: 'Cadastrar novo usuário' })
+  @ApiBody({ type: CreateUserDto })
+  @ApiResponse({ status: 201, description: 'Usuário criado com sucesso' })
+  @ApiResponse({ status: 401, description: 'E-mail já cadastrado' })
+  @ApiBearerAuth('access-token')
+  async signupWithCode(
     @Body() body: CreateUserDto,
     @Headers('authorization') token: string,
   ) {
-    return this.authService.signup(body, token);
+    return this.authService.signupWithCode(body, token);
   }
 
   @Public()
@@ -55,6 +71,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Usuário não autenticado' })
   @ApiBearerAuth('access-token')
   validateToken(@Request() req) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return req.user;
   }
 }
