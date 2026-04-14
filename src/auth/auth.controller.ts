@@ -74,4 +74,12 @@ export class AuthController {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
     return req.user;
   }
+
+  @Public()
+  @Post('oauth/github')
+  @ApiOperation({ summary: 'Autenticar usuário' })
+  signInWithGithub() {
+    return this.authService.signInWithGithub();
+  }
 }
+// https://github.com/login/oauth/authorize

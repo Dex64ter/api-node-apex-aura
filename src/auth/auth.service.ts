@@ -159,4 +159,6 @@ export class AuthService {
 
     return this.login(newUser);
   }
+
+  signInWithGithub() {}
 }
