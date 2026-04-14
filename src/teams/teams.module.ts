@@ -3,9 +3,15 @@ import { TeamsController } from './teams.controller';
 import { TeamsService } from './teams.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { TeamSchema } from './schemas/team.schema';
+import { TeamMemberSchema } from './schemas/team-member.schema';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: 'Team', schema: TeamSchema }])],
+  imports: [
+    MongooseModule.forFeature([
+      { name: 'Team', schema: TeamSchema },
+      { name: 'TeamMember', schema: TeamMemberSchema },
+    ]),
+  ],
   controllers: [TeamsController],
   providers: [TeamsService],
   exports: [TeamsService],

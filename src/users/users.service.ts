@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from './entities/user.schema';
+import { User } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import * as bcryptjs from 'bcryptjs';
 
@@ -13,8 +13,15 @@ export class UsersService {
 
   async create(data: CreateUserDto) {
     data.password = await bcryptjs.hash(data.password, 10);
-    const user = await this.userModel.create(data);
-    return { name: user.name };
+    try {
+      const user = await this.userModel.create(data);
+      this.logger.log(`User created: ${user.email}`);
+      return user;
+    } catch (error) {
+      this.logger.error('Error creating user', error);
+      console.error(error);
+      throw error;
+    }
   }
 
   async findAll() {
