@@ -11,15 +11,6 @@ function generateInviteCode(): string {
   ).join('');
 }
 
-@Schema()
-class Member {
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  userId: Types.ObjectId;
-
-  @Prop({ enum: ['member', 'boss'], default: 'member' })
-  role: string;
-}
-
 @Schema({ timestamps: true })
 export class Team {
   _id: string;
@@ -29,9 +20,6 @@ export class Team {
 
   @Prop({ default: () => generateInviteCode(), unique: true })
   invite_code: string;
-
-  @Prop({ type: [Member], default: [] })
-  members: Member[];
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   created_by: Types.ObjectId;

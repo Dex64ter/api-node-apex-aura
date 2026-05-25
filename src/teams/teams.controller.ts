@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Request } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Request,
+} from '@nestjs/common';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { JoinTeamDto } from './dto/join-team.dto';
 import { TeamsService } from './teams.service';
@@ -11,6 +19,7 @@ import {
 } from '@nestjs/swagger';
 import type { AuthenticatedRequest } from 'src/common/types/auth-request';
 import { Auth } from 'src/common/decorators/auth.decorator';
+import { CreateTeamTaskDto } from './dto/create-team-task.dto';
 
 @ApiTags('Teams')
 @Controller('teams')
@@ -38,6 +47,18 @@ export class TeamsController {
     return this.teamService.create(body, req.user.userId);
   }
 
+  @Get(':id')
+  getTeamById(@Param('id') id: string) {
+    return this.teamService.findOne(id);
+  }
+
+  @Delete(':id')
+  @ApiBearerAuth('access-token')
+  @Auth()
+  removeTeamById(@Param('id') id: string) {
+    return this.teamService.remove(id);
+  }
+
   @Post('join')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Entrar em uma equipe pelo código de convite' })
@@ -50,8 +71,28 @@ export class TeamsController {
     return this.teamService.join(body, req.user.userId);
   }
 
-  @Get(':id')
-  getTeamById(@Param('id') id: string) {
-    return this.teamService.findOne(id);
+  @Get(':id/members')
+  @ApiBearerAuth('access-token')
+  @Auth()
+  @ApiOperation({ summary: 'Listar membros de uma equipe' })
+  @ApiResponse({ status: 200, description: 'Membros listados com sucesso' })
+  @ApiResponse({ status: 404, description: 'Equipe não encontrada' })
+  getTeamMembersById(@Param('id') id: string) {
+    return this.teamService.getMembers(id);
+  }
+
+  @Post(':teamId/tasks')
+  @ApiBearerAuth('access-token')
+  @Auth()
+  @ApiOperation({ summary: 'Criar uma tarefa para uma equipe' })
+  @ApiBody({ type: CreateTeamTaskDto })
+  @ApiResponse({ status: 201, description: 'Tarefa criada com sucesso' })
+  @ApiResponse({ status: 404, description: 'Equipe não encontrada' })
+  createTask(
+    @Param('teamId') teamId: string,
+    @Body() body: CreateTeamTaskDto,
+    @Request() req: AuthenticatedRequest,
+  ) {
+    return this.teamService.createTask(teamId, body, req.user.userId);
   }
 }
