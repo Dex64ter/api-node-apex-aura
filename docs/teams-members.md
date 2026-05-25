@@ -1,12 +1,12 @@
 # Teams e membros (TeamMember)
 
-Este documento descreve como times e membros são modelados na API, quais endpoints existem, regras de negócio e como testar.
+Este documento descreve como times e membros são modelados na API, o módulo **feature-based** `team-members`, endpoints e como testar.
 
 ---
 
 ## Visão geral
 
-Um **time** (`teams`) é um grupo com nome, código de convite e criador. A relação entre **usuários** e **times** (com papel `boss` ou `member`) fica na coleção **`teammembers`** — não em um array embutido no documento do time.
+Um **time** (`teams`) é um grupo com nome, código de convite e criador. A relação entre **usuários** e **times** (com papel `boss` ou `member`) fica na coleção **`teammembers`**, gerenciada pelo módulo `src/team-members/`.
 
 ```mermaid
 erDiagram
@@ -28,27 +28,34 @@ erDiagram
     }
 ```
 
-### Por que não usar `members[]` embutido em `Team`?
+**Fonte única de verdade:** coleção `TeamMember` (`teammembers`). O documento `teams` não embute lista de membros.
 
-Em versões anteriores o schema `Team` tinha `members: Member[]`, mas `create` e `join` **só gravavam** em `teammembers`. O array embutido permanecia vazio (`[]`), o que gerava confusão ao inspecionar o MongoDB ou chamar `GET /teams/:id`.
+---
 
-**Decisão atual:** fonte única de verdade = coleção `TeamMember` (`teammembers` no MongoDB).
+## Estrutura do módulo `team-members`
+
+```
+src/team-members/
+├── team-members.module.ts
+├── team-members.service.ts      # Regras de negócio e CRUD
+├── team-members.controller.ts   # Rotas REST
+├── schemas/
+│   └── team-member.schema.ts
+└── dto/
+    ├── join-team.dto.ts
+    ├── create-team-member.dto.ts
+    └── update-team-member.dto.ts
+```
+
+O módulo `teams` importa `TeamMembersModule` e delega operações de membros ao `TeamMembersService`.
+
+Ao criar um time (`TeamsService.create`), se o vínculo do boss falhar após o documento do time ser salvo, o time é **removido** (rollback) para não deixar times sem boss no banco.
 
 ---
 
 ## Schemas
 
-### `Team` (`src/teams/schemas/team.schema.ts`)
-
-| Campo        | Tipo     | Descrição                                      |
-|-------------|----------|------------------------------------------------|
-| `name`      | string   | Nome do time                                   |
-| `invite_code` | string | Código de 8 caracteres (A–Z, 0–9), único, gerado automaticamente |
-| `created_by` | ObjectId | Referência ao usuário criador               |
-
-`generateInviteCode()` usa `crypto.randomInt` (Node.js), compatível com o build CommonJS do NestJS.
-
-### `TeamMember` (`src/teams/schemas/team-member.schema.ts`)
+### `TeamMember` (`src/team-members/schemas/team-member.schema.ts`)
 
 | Campo   | Tipo     | Descrição                          |
 |---------|----------|------------------------------------|
@@ -60,187 +67,133 @@ Em versões anteriores o schema `Team` tinha `members: Member[]`, mas `create` e
 
 ## Endpoints
 
-Todos os endpoints abaixo (exceto onde indicado) exigem JWT (`Authorization: Bearer <token>`).
+Todos exigem JWT (`Authorization: Bearer <token>`), exceto onde indicado.
 
-| Método | Rota                    | Descrição                          |
-|--------|-------------------------|------------------------------------|
-| `POST` | `/teams`                | Criar time (criador vira `boss`)   |
-| `POST` | `/teams/join`           | Entrar no time via `invite_code`   |
-| `GET`  | `/teams/:id`            | Detalhe do time + lista `members`  |
-| `GET`  | `/teams/:id/members`    | Listar membros do time             |
-| `POST` | `/teams/:teamId/tasks`  | Criar tarefa (apenas `boss`)       |
+### Team Members (CRUD)
 
-Swagger: `http://localhost:8080/api-docs` (tag **Teams**).
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/teams/:teamId/members` | Listar membros do time |
+| `GET` | `/teams/:teamId/members/:id` | Buscar vínculo pelo `_id` em `teammembers` |
+| `POST` | `/teams/:teamId/members` | Boss adiciona usuário (`userId`, `role?`) |
+| `PATCH` | `/teams/:teamId/members/:id` | Boss altera papel (`role`) |
+| `DELETE` | `/teams/:teamId/members/:id` | Boss remove outro ou membro sai do time |
+
+### Ações globais
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/team-members/join` | Entrar no time via `invite_code` (**recomendado**) |
+| `GET` | `/team-members/me/teams` | Times do usuário autenticado |
+
+### Teams (legado / agregado)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `POST` | `/teams` | Criar time (criador vira `boss` via `TeamMembersService`) |
+| `POST` | `/teams/join` | Join legado — delega para `TeamMembersService` |
+| `GET` | `/teams/:id` | Time + `members` agregados de `teammembers` |
+| `POST` | `/teams/:teamId/tasks` | Criar tarefa (usa `assertBoss`) |
+
+Swagger: tag **Team Members** e **Teams**.
+
+---
+
+## `TeamMembersService` — métodos
+
+| Método | Descrição |
+|--------|-----------|
+| `create(teamId, userId, role)` | Cria vínculo; falha com 409 se já existir |
+| `joinByInviteCode(dto, userId)` | Resolve time pelo `invite_code` e cria `member` |
+| `findAllByTeam(teamId)` | Lista membros com `userId` populado |
+| `findOne(teamId, memberId)` | Um vínculo por `_id` do documento |
+| `findTeamsByUser(userId)` | Todos os times do usuário |
+| `findMembership(teamId, userId)` | Busca vínculo (autorização interna) |
+| `assertBoss(teamId, userId)` | Lança 403 se não for boss |
+| `addByBoss(teamId, dto, requesterId)` | Boss adiciona membro manualmente |
+| `updateRole(teamId, memberId, dto, requesterId)` | Boss muda papel; impede remover último boss |
+| `remove(teamId, memberId, requesterId)` | Boss remove outro ou usuário sai; protege último boss |
 
 ---
 
 ## DTOs
 
-### `JoinTeamDto` (`src/teams/dto/join-team.dto.ts`)
+### `JoinTeamDto`
 
-Body de `POST /teams/join`:
+```json
+{ "invite_code": "AB12CD34" }
+```
 
-| Campo         | Validação              | Exemplo    |
-|---------------|------------------------|------------|
-| `invite_code` | string, 8 chars, alfanumérico | `AB12CD34` |
+### `CreateTeamMemberDto` — `POST /teams/:teamId/members`
 
-O `teamId` **não** vai no body; o time é resolvido pelo código.
+```json
+{
+  "userId": "507f1f77bcf86cd799439011",
+  "role": "member"
+}
+```
 
----
+### `UpdateTeamMemberDto` — `PATCH /teams/:teamId/members/:id`
 
-## `TeamsService` — métodos
-
-### `create(data, userId)`
-
-Cria um time e registra o usuário como **boss** em `teammembers`.
-
-1. Impede dois times com o mesmo `name` para o mesmo `created_by`.
-2. Insere documento em `teams`.
-3. Insere `{ teamId, userId, role: 'boss' }` em `teammembers`.
-
-**Retorno:** `{ id, name }`
+```json
+{ "role": "boss" }
+```
 
 ---
 
-### `join(data, userId)`
+## Regras de permissão
 
-Permite que um usuário entre em um time existente.
+| Ação | Quem pode |
+|------|-----------|
+| Listar / ver membros | Qualquer autenticado (time deve existir) |
+| Join | Usuário autenticado |
+| Adicionar membro | Boss do time |
+| Alterar papel | Boss do time |
+| Remover outro | Boss do time |
+| Sair do time | O próprio membro (`DELETE` no próprio vínculo) |
+| Criar tarefa | Boss (`TeamsService` → `assertBoss`) |
 
-1. Normaliza `invite_code` (`trim` + `toUpperCase`).
-2. Busca time por `invite_code` → se não existir: `404` (`Código de convite inválido`).
-3. Verifica se já existe registro em `teammembers` para `(teamId, userId)` → se sim: `409` (`Você já faz parte deste time`).
-4. Cria registro com `role: 'member'`.
-
-**Retorno:** `{ id, name, role: 'member' }`
-
-**Importante:** não altera o documento `teams`; apenas `teammembers`.
-
----
-
-### `findOne(id)`
-
-Retorna o time com membros agregados na resposta.
-
-1. Busca `teams` por `_id` e popula `created_by`.
-2. Se não existir: `404` (`Equipe não encontrada`).
-3. Busca `teammembers` com `teamId` e popula `userId` (`name`, `email`, `avatarUrl`, `aura`).
-4. Retorna `{ ...team, members }`.
-
-Use este endpoint quando o front precisar do time **e** da lista de membros em uma única chamada.
-
----
-
-### `getMembers(id)`
-
-Lista membros de um time (endpoint dedicado).
-
-1. Valida se o time existe (`findById`).
-2. Se não existir: `404`.
-3. Retorna documentos de `teammembers` com `userId` populado.
-
-Equivalente a `findOne(id).members`, sem os demais campos do time.
-
----
-
-### `createTask(teamId, data, userId)`
-
-Cria tarefa no time; exige papel **boss** em `teammembers`.
-
-1. Consulta `teammembers` com `teamId`, `userId` e `role: 'boss'`.
-2. Se não for boss: `403` (`Você não é um boss deste time`).
-3. Cria documento em `tasks` com `status: 'open'`.
-
-A autorização usa `teammembers`, não um array embutido no time.
-
----
-
-## Papéis (`role`)
-
-| Papel    | Como obtém                         | Permissões atuais        |
-|----------|------------------------------------|--------------------------|
-| `boss`   | Criar o time (`POST /teams`)       | Criar tarefas no time    |
-| `member` | Entrar via join (`POST /teams/join`) | (futuro: executar tarefas) |
+**Proteções:** não rebaixar/remover o único boss do time.
 
 ---
 
 ## Como testar
 
-### Via API (manual)
+### API
 
 ```http
-# 1. Criar time — usuário A
-POST /teams
-Authorization: Bearer <token_A>
-Content-Type: application/json
-
-{ "name": "Squad Aura" }
-
-# Anote o invite_code (Mongo ou resposta futura se exposto)
-
-# 2. Entrar no time — usuário B
-POST /teams/join
-Authorization: Bearer <token_B>
-Content-Type: application/json
-
+POST /team-members/join
+Authorization: Bearer <token>
 { "invite_code": "AB12CD34" }
 
-# 3. Listar membros
 GET /teams/<teamId>/members
-Authorization: Bearer <token_A ou B>
+Authorization: Bearer <token>
 
-# 4. Ver time com members na resposta
-GET /teams/<teamId>
+GET /team-members/me/teams
 Authorization: Bearer <token>
 ```
 
-Resposta esperada em `/members` ou em `findOne.members`: pelo menos 2 registros (boss + member), com `userId` populado.
-
-### Via MongoDB
+### MongoDB
 
 ```javascript
-// Membros (fonte de verdade)
-db.teammembers.find({ teamId: ObjectId("SEU_TEAM_ID") })
-
-// Time (sem array members embutido)
-db.teams.findOne({ _id: ObjectId("SEU_TEAM_ID") })
+db.teammembers.find({ teamId: ObjectId("...") })
 ```
 
-### Testes automatizados
+### Testes unitários
 
 ```bash
-npm test -- teams.service.spec
+npm test -- team-members
+npm test -- teams.service
 ```
 
-Cenários cobertos:
-
-- Join com código válido → cria em `teammembers`.
-- Código inválido → `NotFoundException`.
-- Usuário já membro → `ConflictException`.
-- Join **não** grava em `teams.members[]` (apenas `teamMemberModel.create`).
-- `getMembers` lê de `teammembers`.
-- Time inexistente em `getMembers` → `NotFoundException`.
-
 ---
 
-## Histórico de mudanças relevantes
-
-| Mudança | Motivo |
-|---------|--------|
-| Remoção de `members[]` em `Team` | Evitar duplicidade e dados sempre vazios |
-| `findOne` agrega `members` de `teammembers` | API coerente para o front |
-| `getMembers` valida time + populate `userId` | 404 correto e payload útil |
-| `join` grava só em `teammembers` | Modelo relacional escalável |
-| `generateInviteCode` com `crypto` | Substituir `nanoid` (ESM) no build CJS |
-
----
-
-## Referências no código
+## Referências
 
 | Arquivo | Responsabilidade |
 |---------|------------------|
-| `src/teams/schemas/team.schema.ts` | Schema do time |
-| `src/teams/schemas/team-member.schema.ts` | Schema membro ↔ time |
-| `src/teams/teams.service.ts` | Regras de negócio |
-| `src/teams/teams.controller.ts` | Rotas HTTP |
-| `src/teams/dto/join-team.dto.ts` | Validação do body de join |
-| `src/teams/teams.service.spec.ts` | Testes unitários |
+| `src/team-members/team-members.module.ts` | Módulo Nest |
+| `src/team-members/team-members.service.ts` | CRUD e regras |
+| `src/team-members/team-members.controller.ts` | HTTP |
+| `src/teams/teams.service.ts` | Times; delega membros |
+| `docs/teams-members.md` | Este documento |

@@ -8,7 +8,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { CreateTeamDto } from './dto/create-team.dto';
-import { JoinTeamDto } from './dto/join-team.dto';
+import { JoinTeamDto } from 'src/team-members/dto/join-team.dto';
 import { TeamsService } from './teams.service';
 import {
   ApiBearerAuth,
@@ -61,24 +61,18 @@ export class TeamsController {
 
   @Post('join')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Entrar em uma equipe pelo código de convite' })
+  @Auth()
+  @ApiOperation({
+    summary: 'Entrar em uma equipe pelo código de convite (legado)',
+    deprecated: true,
+    description: 'Prefira POST /team-members/join',
+  })
   @ApiBody({ type: JoinTeamDto })
   @ApiResponse({ status: 201, description: 'Entrou na equipe com sucesso' })
   @ApiResponse({ status: 404, description: 'Código de convite inválido' })
   @ApiResponse({ status: 409, description: 'Usuário já é membro do time' })
-  @Auth()
   joinTeam(@Body() body: JoinTeamDto, @Request() req: AuthenticatedRequest) {
     return this.teamService.join(body, req.user.userId);
-  }
-
-  @Get(':id/members')
-  @ApiBearerAuth('access-token')
-  @Auth()
-  @ApiOperation({ summary: 'Listar membros de uma equipe' })
-  @ApiResponse({ status: 200, description: 'Membros listados com sucesso' })
-  @ApiResponse({ status: 404, description: 'Equipe não encontrada' })
-  getTeamMembersById(@Param('id') id: string) {
-    return this.teamService.getMembers(id);
   }
 
   @Post(':teamId/tasks')

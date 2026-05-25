@@ -3,10 +3,10 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class TeamMember {
-  @Prop({ type: Types.ObjectId, ref: 'Team' })
+  @Prop({ type: Types.ObjectId, ref: 'Team', required: true })
   teamId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId, ref: 'User' })
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   userId: Types.ObjectId;
 
   @Prop({ enum: ['member', 'boss'], default: 'member' })

@@ -35,6 +35,7 @@ src/
 ├── auth/
 ├── users/
 ├── teams/
+├── team-members/
 ├── tasks/
 ├── aura/
 ├── badges/
@@ -48,7 +49,7 @@ docs/
 
 # 📚 Documentação
 
-* [Times e membros](docs/teams-members.md) — modelo `TeamMember`, join por `invite_code`, endpoints, papéis (`boss` / `member`) e como testar
+* [Times e membros](docs/teams-members.md) — módulo `team-members`, CRUD de vínculos, join, papéis (`boss` / `member`) e como testar
 
 ---
 

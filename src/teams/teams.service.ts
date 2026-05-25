@@ -1,7 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
-  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -10,10 +8,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Team } from './schemas/team.schema';
 import { CreateTeamDto } from './dto/create-team.dto';
-import { JoinTeamDto } from './dto/join-team.dto';
-import { TeamMember } from './schemas/team-member.schema';
+import { JoinTeamDto } from 'src/team-members/dto/join-team.dto';
 import { CreateTeamTaskDto } from './dto/create-team-task.dto';
 import { Task } from 'src/tasks/schemas/tasks.schema';
+import { TeamMembersService } from 'src/team-members/team-members.service';
 
 @Injectable()
 export class TeamsService {
@@ -23,11 +21,10 @@ export class TeamsService {
     @InjectModel(Team.name)
     private teamModel: Model<Team>,
 
-    @InjectModel(TeamMember.name)
-    private teamMemberModel: Model<TeamMember>,
-
     @InjectModel(Task.name)
     private taskModel: Model<Task>,
+
+    private teamMembersService: TeamMembersService,
   ) {}
 
   async create(data: CreateTeamDto, userId: string) {
@@ -46,11 +43,16 @@ export class TeamsService {
         created_by: userId,
       });
 
-      await this.teamMemberModel.create({
-        teamId: team._id,
-        userId,
-        role: 'boss',
-      });
+      try {
+        await this.teamMembersService.create(team._id, userId, 'boss');
+      } catch (memberError) {
+        await this.teamModel.findByIdAndDelete(team._id);
+        this.logger.error(
+          'Rolled back team creation: boss membership failed',
+          memberError,
+        );
+        throw memberError;
+      }
 
       return {
         id: team._id,
@@ -62,35 +64,9 @@ export class TeamsService {
     }
   }
 
+  /** @deprecated Prefira `POST /team-members/join` */
   async join(data: JoinTeamDto, userId: string) {
-    const inviteCode = data.invite_code.trim().toUpperCase();
-
-    const team = await this.teamModel.findOne({ invite_code: inviteCode });
-
-    if (!team) {
-      throw new NotFoundException('Código de convite inválido');
-    }
-
-    const existingMember = await this.teamMemberModel.findOne({
-      teamId: team._id,
-      userId,
-    });
-
-    if (existingMember) {
-      throw new ConflictException('Você já faz parte deste time');
-    }
-
-    await this.teamMemberModel.create({
-      teamId: team._id,
-      userId,
-      role: 'member',
-    });
-
-    return {
-      id: team._id,
-      name: team.name,
-      role: 'member',
-    };
+    return this.teamMembersService.joinByInviteCode(data, userId);
   }
 
   async findAll() {
@@ -110,9 +86,7 @@ export class TeamsService {
         throw new NotFoundException('Equipe não encontrada');
       }
 
-      const members = await this.teamMemberModel
-        .find({ teamId: team._id })
-        .populate('userId', 'name email avatarUrl aura');
+      const members = await this.teamMembersService.findAllByTeam(id);
 
       return {
         ...team.toObject(),
@@ -146,34 +120,9 @@ export class TeamsService {
     }
   }
 
-  async getMembers(id: string) {
-    try {
-      const team = await this.teamModel.findById(id);
-
-      if (!team) {
-        throw new NotFoundException('Equipe não encontrada');
-      }
-
-      return this.teamMemberModel
-        .find({ teamId: team._id })
-        .populate('userId', 'name email avatarUrl aura');
-    } catch (error) {
-      this.logger.error('Error fetching team members', error);
-      throw error;
-    }
-  }
-
   async createTask(teamId: string, data: CreateTeamTaskDto, userId: string) {
     try {
-      const checkBoss = await this.teamMemberModel.findOne({
-        teamId: new Types.ObjectId(teamId),
-        userId: new Types.ObjectId(userId),
-        role: 'boss',
-      });
-
-      if (!checkBoss) {
-        throw new ForbiddenException('Você não é um boss deste time');
-      }
+      await this.teamMembersService.assertBoss(teamId, userId);
 
       const task = await this.taskModel.create({
         ...data,

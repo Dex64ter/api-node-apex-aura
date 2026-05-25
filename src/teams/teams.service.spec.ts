@@ -1,10 +1,9 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TeamsService } from './teams.service';
 import { Team } from './schemas/team.schema';
-import { TeamMember } from './schemas/team-member.schema';
 import { Task } from 'src/tasks/schemas/tasks.schema';
+import { TeamMembersService } from 'src/team-members/team-members.service';
 
 describe('TeamsService', () => {
   let service: TeamsService;
@@ -16,23 +15,17 @@ describe('TeamsService', () => {
     findById: jest.fn(),
     findByIdAndUpdate: jest.fn(),
     findByIdAndDelete: jest.fn(),
-  } as {
-    findOne: jest.Mock;
-    create: jest.Mock;
-    find: jest.Mock;
-    findById: jest.Mock;
-    findByIdAndUpdate: jest.Mock;
-    findByIdAndDelete: jest.Mock;
-  };
-
-  const teamMemberModel = {
-    findOne: jest.fn(),
-    find: jest.fn(),
-    create: jest.fn(),
   };
 
   const taskModel = {
     create: jest.fn(),
+  };
+
+  const teamMembersService = {
+    create: jest.fn(),
+    joinByInviteCode: jest.fn(),
+    findAllByTeam: jest.fn(),
+    assertBoss: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -42,95 +35,64 @@ describe('TeamsService', () => {
       providers: [
         TeamsService,
         { provide: getModelToken(Team.name), useValue: teamModel },
-        { provide: getModelToken(TeamMember.name), useValue: teamMemberModel },
         { provide: getModelToken(Task.name), useValue: taskModel },
+        { provide: TeamMembersService, useValue: teamMembersService },
       ],
     }).compile();
 
     service = module.get<TeamsService>(TeamsService);
   });
 
-  describe('join', () => {
-    const userId = 'user-123';
-    const team = { _id: 'team-456', name: 'Squad Aura' };
+  it('should be defined', () => {
+    expect(service).toBeDefined();
+  });
 
-    it('adds user as member when invite code is valid', async () => {
-      teamModel.findOne.mockResolvedValue(team);
-      teamMemberModel.findOne.mockResolvedValue(null);
-      teamMemberModel.create.mockResolvedValue({});
-
-      const result = await service.join({ invite_code: 'ab12cd34' }, userId);
-
-      expect(teamModel.findOne).toHaveBeenCalledWith({
-        invite_code: 'AB12CD34',
-      });
-      expect(teamMemberModel.create).toHaveBeenCalledWith({
-        teamId: team._id,
-        userId,
-        role: 'member',
-      });
-      expect(result).toEqual({
-        id: team._id,
-        name: team.name,
-        role: 'member',
-      });
-    });
-
-    it('throws NotFoundException when invite code does not exist', async () => {
+  describe('create', () => {
+    it('registers creator as boss via TeamMembersService', async () => {
+      const team = { _id: 'team-1', name: 'Squad' };
       teamModel.findOne.mockResolvedValue(null);
+      teamModel.create.mockResolvedValue(team);
+      teamMembersService.create.mockResolvedValue({});
 
-      await expect(
-        service.join({ invite_code: 'ZZZZZZZZ' }, userId),
-      ).rejects.toThrow(NotFoundException);
+      await service.create({ name: 'Squad' }, 'user-1');
+
+      expect(teamMembersService.create).toHaveBeenCalledWith(
+        team._id,
+        'user-1',
+        'boss',
+      );
+      expect(teamModel.findByIdAndDelete).not.toHaveBeenCalled();
     });
 
-    it('throws ConflictException when user is already a member', async () => {
-      teamModel.findOne.mockResolvedValue(team);
-      teamMemberModel.findOne.mockResolvedValue({ role: 'member' });
+    it('deletes the team when boss membership creation fails', async () => {
+      const team = { _id: '507f1f77bcf86cd799439012', name: 'Squad' };
+      const memberError = new Error('membership failed');
 
-      await expect(
-        service.join({ invite_code: 'AB12CD34' }, userId),
-      ).rejects.toThrow(ConflictException);
-      expect(teamMemberModel.create).not.toHaveBeenCalled();
-    });
+      teamModel.findOne.mockResolvedValue(null);
+      teamModel.create.mockResolvedValue(team);
+      teamMembersService.create.mockRejectedValue(memberError);
+      teamModel.findByIdAndDelete.mockResolvedValue(team);
 
-    it('does not update embedded members on the team document', async () => {
-      teamModel.findOne.mockResolvedValue(team);
-      teamMemberModel.findOne.mockResolvedValue(null);
-      teamMemberModel.create.mockResolvedValue({});
+      await expect(service.create({ name: 'Squad' }, 'user-1')).rejects.toThrow(
+        memberError,
+      );
 
-      await service.join({ invite_code: 'AB12CD34' }, userId);
-
-      expect(teamModel.create).not.toHaveBeenCalled();
-      expect(teamMemberModel.create).toHaveBeenCalledTimes(1);
+      expect(teamModel.findByIdAndDelete).toHaveBeenCalledWith(team._id);
     });
   });
 
-  describe('getMembers', () => {
-    it('returns members from teammembers collection', async () => {
-      const team = { _id: 'team-456' };
-      const members = [
-        { userId: 'user-1', role: 'boss' },
-        { userId: 'user-2', role: 'member' },
-      ];
-
-      teamModel.findById.mockResolvedValue(team);
-      teamMemberModel.find.mockReturnValue({
-        populate: jest.fn().mockResolvedValue(members),
+  describe('join', () => {
+    it('delegates to TeamMembersService.joinByInviteCode', async () => {
+      teamMembersService.joinByInviteCode.mockResolvedValue({
+        id: 'team-1',
+        name: 'Squad',
+        role: 'member',
       });
 
-      const result = await service.getMembers(team._id);
+      const result = await service.join({ invite_code: 'AB12CD34' }, 'user-2');
 
-      expect(teamMemberModel.find).toHaveBeenCalledWith({ teamId: team._id });
-      expect(result).toEqual(members);
-    });
-
-    it('throws NotFoundException when team does not exist', async () => {
-      teamModel.findById.mockResolvedValue(null);
-
-      await expect(service.getMembers('invalid-id')).rejects.toThrow(
-        NotFoundException,
-      );
+      expect(teamMembersService.joinByInviteCode).toHaveBeenCalled();
+      expect(result.role).toBe('member');
     });
   });
 });
