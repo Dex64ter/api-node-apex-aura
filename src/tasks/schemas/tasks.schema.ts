@@ -4,7 +4,7 @@ import { Types, Document } from 'mongoose';
 @Schema({ timestamps: true })
 export class Task extends Document {
   @Prop({ type: Types.ObjectId, ref: 'Team', required: true })
-  teamId: string;
+  teamId: Types.ObjectId;
 
   @Prop({ required: true })
   title: string;
@@ -29,6 +29,9 @@ export class Task extends Document {
 
   @Prop({ type: Types.ObjectId, ref: 'User' })
   assignedTo: Types.ObjectId;
+
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  createdBy: Types.ObjectId;
 }
 
 export const TaskSchema = SchemaFactory.createForClass(Task);

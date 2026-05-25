@@ -40,7 +40,15 @@ src/
 ├── badges/
 ├── common/
 ├── database/
+docs/
+├── teams-members.md
 ```
+
+---
+
+# 📚 Documentação
+
+* [Times e membros](docs/teams-members.md) — modelo `TeamMember`, join por `invite_code`, endpoints, papéis (`boss` / `member`) e como testar
 
 ---
 
